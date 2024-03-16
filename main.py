@@ -1,225 +1,216 @@
-from http.server import BaseHTTPRequestHandler
-import socketserver
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 11 23:43:51 2022
+
+@author: jacob
+"""
+
+
+# A very simple Flask Hello World app for you to get started with...
+
+from flask import Flask, request
 import numpy as np
 from PIL import Image
-import io
 
-class handler(BaseHTTPRequestHandler):
-    html = ['<html><head><title>Sudoku solver</title><style>',
+
+app = Flask(__name__)
+
+@app.route('/', methods = ['POST', 'GET'])
+def index():
+    if request.method == 'POST':
+        return do_POST()
+    else:
+        return do_GET()
+
+html = ['<html><head><title>Sudoku solver</title><style>',
             '</style><script type="text/javascript">function openTab(tab) { document.getElementById("tab1").className = "buttons tab"; document.getElementById("tab2").className = "buttons tab"; document.getElementById("tab3").className = "buttons tab"; document.getElementById("content1").style.display = "none"; document.getElementById("content2").style.display = "none"; document.getElementById("content3").style.display = "none"; document.getElementById("tab" + String(tab)).className += " tabOpen"; document.getElementById("content" + String(tab)).style.display = "block"; }; function updatePrefs() { for (var i = 0; i < 3; i++) { if (document.getElementsByClassName("taskInput")[i].checked) { for (var j = 0; j < 3; j++) { document.getElementsByClassName("taskHiddenInput")[j].setAttribute("value", document.getElementsByClassName("taskInput")[i].getAttribute("value")); }; }; }; }; function sumbitSudoku() { updatePrefs(); sudoku.submit(); }; function submitVersion() { updatePrefs(); for (var i = 0; i < 3; i++) { if (document.getElementsByClassName("versionInput")[i].checked) { for (var j = 0; j < 3; j++) { document.getElementsByClassName("versionHiddenInput")[j].setAttribute("value", document.getElementsByClassName("versionInput")[i].getAttribute("value")); }; }; }; version.submit(); }; function submitUpload() { updatePrefs(); upload.submit(); };</script> </head><body><h1 id="header">Sudoku solver</h1><div id="content"><form id="sudoku" method="post"> <input name="type" class="hiddenInputs" value="sudoku"></input> <input name="version" class="hiddenInputs versionHiddenInput" value="',
             '"></input> <input name="task" class="hiddenInputs taskHiddenInput"></input>',
-            '</form><div id="controls"> <label for="image" class="control buttons"> Upload Sudoku image<form id = "upload" method="post" enctype="multipart/form-data"> <input name="type" class="hiddenInputs" value="image"></input> <input name="version" class="hiddenInputs versionHiddenInput" value="', 
+            '</form><div id="controls"> <label for="image" class="control buttons"> Upload Sudoku image<form id = "upload" method="post" enctype="multipart/form-data"> <input name="type" class="hiddenInputs" value="image"></input> <input name="version" class="hiddenInputs versionHiddenInput" value="',
             '"></input> <input name="task" class="hiddenInputs taskHiddenInput"></input> <input id="image" type="file" name="filename" onchange="submitUpload()"></form> </label> <label id="prefernceControl" class="control" for="photo"><div id="tabs"><div id="tab0"> Preferences</div><div id="tab1" class="buttons tab tabOpen" onclick="openTab(1)"> Menu</div><div id="tab2" class="buttons tab" onclick="openTab(2)"> Version</div><div id="tab3" class="buttons tab" onclick="openTab(3)">Task</div></div><div id="content1" class="content">',
-            '</div><div id="content2" class="content"><form id="version" method="post"> <label for="version">Version: </label></br> <input class="versionInput" type="radio" id="99standard" name="version" value="99standard"',
+            '</br><a href="/static/Documentation.pdf">Documentation</a></div><div id="content2" class="content"><form id="version" method="post"> <label for="version">Version: </label></br> <input class="versionInput" type="radio" id="99standard" name="version" value="99standard"',
             '> <label for="99standard">Standard 9x9</label></br> <input class="versionInput" type="radio" id="sudokuX" name="version" value="sudokuX"',
             '> <label for="sudokuX">sudokuX 9x9</label></br> <input class="versionInput" type="radio" id="44standard" name="version" value="44standard"',
             '> <label for="44standard">Standard 4x4</label></br> <input name="type" class="hiddenInputs" value="version"></input> <input name="version" class="hiddenInputs versionHiddenInput" value="',
             '"></input> <input name="task" class="hiddenInputs taskHiddenInput"></input> <button type="button" onclick="submitVersion()">Submit</button></form></div><div id="content3" class="content"> <label for="task">Task: </label></br> <input class="taskInput" type="radio" id="solve" name="task" value="solve"',
             '> <label for="solve">Solve sudoku</label></br> <input class="taskInput" type="radio" id="hint" name="task" value="hint"',
-            '> <label for="sudokuX">Provide hint</label></br> <input class="taskInput" type="radio" id="check" name="task" value="check"',
+            '> <label for="hint">Provide hint</label></br> <input class="taskInput" type="radio" id="check" name="task" value="check"',
             '> <label for="check">Check sudoku</label></br></div> </label> <label class="control buttons" onclick="sumbitSudoku()"> Solve Sudoku </label></div></div></body></html>',]
 
-    style = '.buttons{cursor:pointer}#header{font-size:10vh;height:10vh;margin:0}#content{display:flex;flex-wrap:wrap}#sudoku{height:80vh;width:80vh;display:grid;grid-template-columns:squarePlaceHolderVhTimes;grid-gap:1vh;background-color:#000;border:solid #ccc 1vh;float:left}.square{position:relative;height:100%;width:100%;display:grid;grid-template-columns:cellPlaceHolderVhTimes;grid-gap:1vh;background-color:silver}.cell{font-size:cellPlaceHolderVh;height:cellPlaceHolderVh;text-align:center;background-color:#fff;border:0}#image,.hiddenInputs{display:none}.control{background-color:#004080;border-radius:5px;border:1px solid #004080;color:#fff}#controls{flex-grow:100;display:grid;grid-template-rows:26vh 26vh 26vh;grid-gap:1vh;white-space:nowrap;font-size:6vh;padding:1vh 0 0 1vh}#controls>.control{height:26vh;width:100%}.tab{width:25%;background-color:ccc}#tab0{width:25%;background-color:#004080}#tabs{width:100%;display:flex;background-color:ccc}.tabOpen{background-color:#fff;color:#000}.content{background-color:#fff;color:#000;display:none;font-size:3vh}#content1{display:block}.diagonal{background-color: beige;}.incorrectCell{background-color: red;}.incorrectSet{background-color: lightpink;}.hintCell{background-color: green;}.hintSet{background-color: lightgreen;}@media screen and (orientation:portrait){#header{font-size:10vw;height:10vw}#sudoku{height:80vw;width:80vw;grid-template-columns:squarePlaceHolderVwTimes;grid-gap:1vw;border-width:1vw}.square{grid-template-columns:cellPlaceHolderVwTimes;grid-gap:1vw}.cell{font-size:cellPlaceHolderVw;height:cellPlaceHolderVw}#controls{padding-left:0;font-size:6vw;height:6vw;grid-template-rows:26vw 26vw 26vw;grid-gap:1vw;padding:1vw 0 0 1vw}#controls>.control{height:26vw}.content{font-size:3vw}}'
+style = '.buttons{cursor:pointer}#header{font-size:10vh;height:10vh;margin:0}#content{display:flex;flex-wrap:wrap}#sudoku{height:80vh;width:80vh;display:grid;grid-template-columns:squarePlaceHolderVhTimes;grid-gap:1vh;background-color:#000;border:solid #ccc 1vh;float:left}.square{position:relative;height:100%;width:100%;display:grid;grid-template-columns:cellPlaceHolderVhTimes;grid-gap:1vh;background-color:silver}.cell{font-size:cellPlaceHolderVh;height:cellPlaceHolderVh;text-align:center;background-color:#fff;border:0}#image,.hiddenInputs{display:none}.control{background-color:#004080;border-radius:5px;border:1px solid #004080;color:#fff}#controls{flex-grow:100;display:grid;grid-template-rows:26vh 26vh 26vh;grid-gap:1vh;white-space:nowrap;font-size:6vh;padding:1vh 0 0 1vh}#controls>.control{height:26vh;width:100%}.tab{width:25%;background-color:ccc}#tab0{width:25%;background-color:#004080}#tabs{width:100%;display:flex;background-color:ccc}.tabOpen{background-color:#fff;color:#000}.content{background-color:#fff;color:#000;display:none;font-size:3vh}#content1{display:block}.diagonal{background-color: beige;}.incorrectCell{background-color: red;}.incorrectSet{background-color: lightpink;}.hintCell{background-color: green;}.hintSet{background-color: lightgreen;}@media screen and (orientation:portrait){#header{font-size:10vw;height:10vw}#sudoku{height:80vw;width:80vw;grid-template-columns:squarePlaceHolderVwTimes;grid-gap:1vw;border-width:1vw}.square{grid-template-columns:cellPlaceHolderVwTimes;grid-gap:1vw}.cell{font-size:cellPlaceHolderVw;height:cellPlaceHolderVw}#controls{padding-left:0;font-size:6vw;height:6vw;grid-template-rows:26vw 26vw 26vw;grid-gap:1vw;padding:1vw 0 0 1vw}#controls>.control{height:26vw}.content{font-size:3vw}}'
 
-    def sendHtml(self, data):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(data)#.encode("utf8"))
+def makeSudoku(version, params, extraClasses, opacity):
+    sudokuHtml = ''
+    if version == '99standard':
+        sudokuHtml = makeSudokuHtml(9, version, params, extraClasses, opacity)
 
-    def makeSudoku(self, version, params, extraClasses, opacity):
-        sudokuHtml = ''
-        if version == '99standard':
-            sudokuHtml = self.makeSudokuHtml(9, version, params, extraClasses, opacity)
-
-        elif version == 'sudokuX':
-            for i in ['00', '04', '08', '40', '44', '48', '80', '84', '88', '22', '24', '26', '42', '44', '46', '62', '64', '66']:
-                if i in extraClasses:
-                    extraClasses[i] += ' diagonal'
-                else:
-                    extraClasses[i] = 'diagonal'
-                sudokuHtml = self.makeSudokuHtml(9, version, params, extraClasses, opacity)
-
-        elif version == '44standard':
-             sudokuHtml = self.makeSudokuHtml(4, version, params, extraClasses, opacity)
-
-        else:
-           input('error')
-
-        return sudokuHtml
-
-    def makeSudokuHtml(self, size, version, params, extraClasses, opacity):
-        sudokuHtml = ''
-        for s in range(size):
-            sudokuHtml += '<div id="s' + str(s) + '" class="square">\n'
-            for c in range(size):
-                if str(s) + str(c) in params:
-                    sudokuHtml += '<input type="text" size="1" maxlength="1" name="' + str(s) + str(c) + '" value="' + params[str(s) + str(c)] + '" class="cell'
-                else:
-                    sudokuHtml += '<input type="text" size="1" maxlength="1" name="' + str(s) + str(c) + '" value="" class="cell'
-
-                if str(s) + str(c) in extraClasses:
-                    sudokuHtml += ' ' + extraClasses[str(s) + str(c)]
-
-                sudokuHtml += '" style="'
-                if str(s) + str(c) in opacity:
-                    sudokuHtml += 'color: rgba(0, 0, 0, ' + str(opacity[str(s) + str(c)]) + ');'
-
-                sudokuHtml += '">\n'
-
-            sudokuHtml += '</div>\n'
-
-        return sudokuHtml
-
-    def applyStylePlaceHolders(self, squareAmount, cellAmount):
-            squareSize = (81 - squareAmount)/squareAmount
-            cellSize = (squareSize + 1 - cellAmount)/cellAmount
-
-            squarePlaceHolderVhTimes = (str(squareSize) + 'vh ')*squareAmount
-            squarePlaceHolderVwTimes = (str(squareSize) + 'vw ')*squareAmount
-            cellPlaceHolderVh = (str(cellSize) + 'vh ')
-            cellPlaceHolderVw = (str(cellSize) + 'vw ')
-            cellPlaceHolderVhTimes = cellPlaceHolderVh*cellAmount
-            cellPlaceHolderVwTimes = cellPlaceHolderVw*cellAmount
-
-            return self.style.replace('squarePlaceHolderVhTimes', squarePlaceHolderVhTimes).replace('squarePlaceHolderVwTimes', squarePlaceHolderVwTimes).replace('cellPlaceHolderVhTimes', cellPlaceHolderVhTimes).replace('cellPlaceHolderVwTimes', cellPlaceHolderVwTimes).replace('cellPlaceHolderVh', cellPlaceHolderVh).replace('cellPlaceHolderVw', cellPlaceHolderVw)
-
-    def makeStyle(self, version):
-        if version == '99standard':
-            versionStyle = self.applyStylePlaceHolders(3, 3)
-        elif version == 'sudokuX':
-            versionStyle = self.applyStylePlaceHolders(3, 3)
-        elif version == '44standard':
-            versionStyle = self.applyStylePlaceHolders(2, 2)
-        else:
-           input('error')
-
-        return versionStyle
-        
-    def do_GET(self, message = ['Enter your sudoku by uploading an image or type directly into the sudoku.', 'Press solve sudoku when ready to.'], version = '99standard', task = 'solve', params = {}, extraClasses = {}, opacity = {}):
-        index = self.html[0]
-        index += self.makeStyle(version)
-        index += self.html[1]
-        index += version
-        index += self.html[2]
-        index += self.makeSudoku(version, params, extraClasses, opacity)
-        index += self.html[3]
-        index += version
-        index += self.html[4]
-        index += '</br>'.join(message)
-        index += self.html[5]
-
-        if version == '99standard':
-            index += 'checked="checked"'
-        index += self.html[6]
-        if version == 'sudokuX':
-            index += 'checked="checked"'
-        index += self.html[7]
-        if version == '44standard':
-            index += 'checked="checked"'
-
-        index += self.html[8]
-        index += version
-        index += self.html[9]
-            
-        if task == 'solve':
-            index += 'checked="checked"'
-        index += self.html[10]
-        if task == 'hint':
-            index += 'checked="checked"'
-        index += self.html[11]
-        if task == 'check':
-            index += 'checked="checked"'
-
-        index += self.html[12]
-
-        self.sendHtml(index.encode("utf8"))
-            
-    def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        postData = self.rfile.read(content_length)
-        error = False
-
-        if b'image' in postData:
-            filename = postData.split(b'filename="')[1].split(b'"')[0].decode("utf-8")
-            version = '99standard'#postData.split(b'"version"\r\n\r\n')[1].split(b'\r\n')[0].decode("utf-8")
-            task = postData.split(b'"task"\r\n\r\n')[1].split(b'\r\n')[0].decode("utf-8")
-
-            try:
-                imageInput = sudokuImage(self.parseImage(postData))
-            except:
-                error = 'Could not decode image'
-
-            if error == False:
-                imageInput.recognise()
-                self.do_GET(['Sudoku recognised successfully'], version, task, imageInput.getValues(), {}, imageInput.getConfidences())
+    elif version == 'sudokuX':
+        for i in ['00', '04', '08', '40', '44', '48', '80', '84', '88', '22', '24', '26', '42', '44', '46', '62', '64', '66']:
+            if i in extraClasses:
+                extraClasses[i] += ' diagonal'
             else:
-                self.do_GET(['Recognition failed', error], version, task)
-        else:
-            dataDict = {}
-            for datum in postData.decode("utf-8").split('&'):
-                key, value = datum.split('=')
-                dataDict[str(key)] = str(value)
+                extraClasses[i] = 'diagonal'
+            sudokuHtml = makeSudokuHtml(9, version, params, extraClasses, opacity)
 
-            if dataDict['type'] == 'sudoku':
-                if dataDict['version'] == '99standard':
-                    sudokuInput = sudoku(dataDict, 3, 3, 3, 3)
-                elif dataDict['version'] == 'sudokuX':
-                    sudokuInput = sudokuX(dataDict)
-                elif dataDict['version'] == '44standard':
-                    sudokuInput = sudoku(dataDict, 2, 2, 2, 2)
+    elif version == '44standard':
+         sudokuHtml = makeSudokuHtml(4, version, params, extraClasses, opacity)
 
-                if dataDict['task'] == 'solve':
-                    sudokuInput.solve()
-                    if sudokuInput.getNoOfSolutions() > 300:
-                        self.do_GET(['Sudoku has over 300 different solutions!'], dataDict['version'], dataDict['task'], sudokuInput.getValues())
-                    else:
-                        self.do_GET(['Sudoku has ' + str(sudokuInput.getNoOfSolutions()) + ' solution(s)'], dataDict['version'], dataDict['task'], sudokuInput.getValues())
+    else:
+       input('error makeSudoku')
 
-                elif dataDict['task'] == 'hint':
-                    hint = sudokuInput.getHint()
-                    if hint != "unsolvable" and hint != "complete":
-                        extraClasses = {}
-                        for pointer in hint[1]:
-                            x, y = sudokuInput.squareToRowIndividual(pointer[0], pointer[1])
-                            extraClasses[str(x) + str(y)] = 'hintSet'
+    return sudokuHtml
 
-                        x, y = sudokuInput.squareToRowIndividual(hint[0][0], hint[0][1])
-                        extraClasses[str(x) + str(y)] = 'hintCell'
-                        if sudokuInput.getNoOfSolutions() > 300:
-                            self.do_GET(['Sudoku has over 300 different solutions!'], dataDict['version'], dataDict['task'], dataDict, extraClasses)
-                        else:
-                            self.do_GET(['Sudoku has ' + str(sudokuInput.getNoOfSolutions()) + 'solution(s)'], dataDict['version'], dataDict['task'], dataDict, extraClasses)
-                    elif hint == "unsolvable":
-                        self.do_GET(['Sudoku has 0 solutions'], dataDict['version'], dataDict['task'], sudokuInput.getValues())
-                    elif hint == "complete":
-                        self.do_GET(['Sudoku is already complete'], dataDict['version'], dataDict['task'], sudokuInput.getValues())
-
-                elif dataDict['task'] == 'check':
-                    result = sudokuInput.checkSudoku()
-                    if result == True:
-                        self.do_GET(['Sudoku is currently correct'], dataDict['version'], dataDict['task'], dataDict)
-                    else:
-                        extraClasses = {}
-                        for pointer in result[1]:
-                            x, y = sudokuInput.squareToRowIndividual(pointer[0], pointer[1])
-                            extraClasses[str(x) + str(y)] = 'incorrectSet'
-
-                        x, y = sudokuInput.squareToRowIndividual(result[0][0], result[0][1])
-                        extraClasses[str(x) + str(y)] = 'incorrectCell'
-                        self.do_GET(['Sudoku is currently incorrect'], dataDict['version'], dataDict['task'], dataDict, extraClasses)
-
-            elif dataDict['type'] == 'version':
-                self.do_GET(['Enter your sudoku by uploading an image or type directly into the sudoku.', 'Press solve sudoku when ready to.'], dataDict['version'], dataDict['task'], {}, {})
+def makeSudokuHtml(size, version, params, extraClasses, opacity):
+    sudokuHtml = ''
+    for s in range(size):
+        sudokuHtml += '<div id="s' + str(s) + '" class="square">\n'
+        for c in range(size):
+            if str(s) + str(c) in params:
+                sudokuHtml += '<input type="text" size="1" maxlength="1" name="' + str(s) + str(c) + '" value="' + params[str(s) + str(c)] + '" class="cell'
             else:
-                print('error')
+                sudokuHtml += '<input type="text" size="1" maxlength="1" name="' + str(s) + str(c) + '" value="" class="cell'
 
-    def parseImage(self, rawData):
-        filename = rawData.split(b'filename="')[1].split(b'"')[0]
-        data = rawData.split(b'\r\n\r\n')
-        with open('server/received.jpg', 'wb') as f:
-            f.write(data[4])
-        return data[4]
+            if str(s) + str(c) in extraClasses:
+                sudokuHtml += ' ' + extraClasses[str(s) + str(c)]
+
+            sudokuHtml += '" style="'
+            if str(s) + str(c) in opacity:
+                sudokuHtml += 'color: rgba(0, 0, 0, ' + str(opacity[str(s) + str(c)]) + ');'
+
+            sudokuHtml += '">\n'
+
+        sudokuHtml += '</div>\n'
+
+    return sudokuHtml
+
+def applyStylePlaceHolders(squareAmount, cellAmount):
+        squareSize = (81 - squareAmount)/squareAmount
+        cellSize = (squareSize + 1 - cellAmount)/cellAmount
+
+        squarePlaceHolderVhTimes = (str(squareSize) + 'vh ')*squareAmount
+        squarePlaceHolderVwTimes = (str(squareSize) + 'vw ')*squareAmount
+        cellPlaceHolderVh = (str(cellSize) + 'vh ')
+        cellPlaceHolderVw = (str(cellSize) + 'vw ')
+        cellPlaceHolderVhTimes = cellPlaceHolderVh*cellAmount
+        cellPlaceHolderVwTimes = cellPlaceHolderVw*cellAmount
+
+        return style.replace('squarePlaceHolderVhTimes', squarePlaceHolderVhTimes).replace('squarePlaceHolderVwTimes', squarePlaceHolderVwTimes).replace('cellPlaceHolderVhTimes', cellPlaceHolderVhTimes).replace('cellPlaceHolderVwTimes', cellPlaceHolderVwTimes).replace('cellPlaceHolderVh', cellPlaceHolderVh).replace('cellPlaceHolderVw', cellPlaceHolderVw)
+
+def makeStyle(version):
+    if version == '99standard':
+        versionStyle = applyStylePlaceHolders(3, 3)
+    elif version == 'sudokuX':
+        versionStyle = applyStylePlaceHolders(3, 3)
+    elif version == '44standard':
+        versionStyle = applyStylePlaceHolders(2, 2)
+    else:
+       input('error makeStyle')
+
+    return versionStyle
+
+def do_GET(message = ['Enter your sudoku by uploading an image or type directly into the sudoku.', 'Press solve sudoku when ready to.'], version = '99standard', task = 'solve', params = {}, extraClasses = {}, opacity = {}):
+    index = html[0]
+    index += makeStyle(version)
+    index += html[1]
+    index += version
+    index += html[2]
+    index += makeSudoku(version, params, extraClasses, opacity)
+    index += html[3]
+    index += version
+    index += html[4]
+    index += '</br>'.join(message)
+    index += html[5]
+
+    if version == '99standard':
+        index += 'checked="checked"'
+    index += html[6]
+    if version == 'xSudoku':
+        index += 'checked="checked"'
+    index += html[7]
+    if version == '44standard':
+        index += 'checked="checked"'
+
+    index += html[8]
+    index += version
+    index += html[9]
+
+    if task == 'solve':
+        index += 'checked="checked"'
+    index += html[10]
+    if task == 'hint':
+        index += 'checked="checked"'
+    index += html[11]
+    if task == 'check':
+        index += 'checked="checked"'
+
+    index += html[12]
+
+    return index
+
+def do_POST():
+    extraClasses = {}
+    if verbose:
+        print(request.form)
+
+    if request.form['type'] == 'image':
+        img = Image.open(request.files['filename'].stream)
+        if verbose:
+            img.save('file.jpg')
+        imageInput = sudokuImage(img)
+        imageInput.recognise()
+        return do_GET(['Sudoku recognised successfully'], request.form['version'], request.form['task'], imageInput.getValues(), {}, imageInput.getConfidences())
+    elif request.form['type'] == 'sudoku':
+        if request.form['version'] == '99standard':
+            sudokuInput = sudoku(request.form, 3, 3, 3, 3)
+        elif request.form['version'] == 'sudokuX':
+            sudokuInput = sudokuX(request.form)
+        elif request.form['version'] == '44standard':
+            sudokuInput = sudoku(request.form, 2, 2, 2, 2)
+
+
+        if request.form['task'] == 'solve':
+            sudokuInput.solve()
+            if sudokuInput.getNoOfSolutions() > 300:
+                return do_GET(['Sudoku has over 300 different solutions!'], request.form['version'], request.form['task'], sudokuInput.getValues())
+            else:
+                return do_GET(['Sudoku has ' + str(sudokuInput.getNoOfSolutions()) + ' solution(s)'], request.form['version'], request.form['task'], sudokuInput.getValues())
+
+        elif request.form['task'] == 'hint':
+            hint = sudokuInput.getHint()
+            if verbose:
+                print(hint)
+            if hint != "unsolvable" and hint != "complete":
+                extraClasses = {}
+                for pointer in hint[1]:
+                    x, y = sudokuInput.squareToRowIndividual(pointer[0], pointer[1])
+                    extraClasses[str(x) + str(y)] = 'hintSet'
+
+                x, y = sudokuInput.squareToRowIndividual(hint[0][0], hint[0][1])
+                extraClasses[str(x) + str(y)] = 'hintCell'
+                if sudokuInput.getNoOfSolutions() > 300:
+                    return do_GET(['Sudoku has over 300 different solutions!'], request.form['version'], request.form['task'], request.form, extraClasses)
+                else:
+                    return do_GET(['Sudoku has ' + str(sudokuInput.getNoOfSolutions()) + 'solution(s)'], request.form['version'], request.form['task'], request.form, extraClasses)
+            elif hint == "unsolvable":
+                return do_GET(['Sudoku has 0 solutions'], request.form['version'], request.form['task'], sudokuInput.getValues())
+            elif hint == "complete":
+                return do_GET(['Sudoku is already complete'], request.form['version'], request.form['task'], sudokuInput.getValues())
+
+        elif request.form['task'] == 'check':
+            result = sudokuInput.checkSudoku()
+            if result == True:
+                return do_GET(['Sudoku is currently correct'], request.form['version'], request.form['task'], request.form)
+            else:
+                extraClasses = {}
+                for pointer in result[1]:
+                    x, y = sudokuInput.squareToRowIndividual(pointer[0], pointer[1])
+                    extraClasses[str(x) + str(y)] = 'incorrectSet'
+
+                x, y = sudokuInput.squareToRowIndividual(result[0][0], result[0][1])
+                extraClasses[str(x) + str(y)] = 'incorrectCell'
+                return do_GET(['Sudoku is currently incorrect'], request.form['version'], request.form['task'], request.form, extraClasses)
+
+    elif request.form['type'] == 'version':
+        return do_GET(['Enter your sudoku by uploading an image or type directly into the sudoku.', 'Press solve sudoku when ready to.'], request.form['version'], request.form['task'], {}, {})
 
 class sudoku():
     firstChange = []
@@ -261,21 +252,25 @@ class sudoku():
         return values
 
     def getNoOfSolutions(self):
-        return self.noOfSolutions 
+        return self.noOfSolutions
 
     def solve(self):
-        print('Solving')
-        
+        if verbose:
+            print('Solving')
+
         if self.check(self.possibilities):
-            self.display()
+            if verbose:
+                self.display()
             self.applyRestrictions(self.possibilities)
             #self.display()
-            
+
             if self.isSolved():
-                print('Solved')
+                if verbose:
+                    print('Solved')
                 self.grid = self.possibilities
             else:
-                print('Backtracking')
+                if verbose:
+                    print('Backtracking')
                 solutions = self.recursiveSolve(self.possibilities)
                 self.noOfSolutions = len(solutions)
 
@@ -288,7 +283,7 @@ class sudoku():
                             for col in range(self.squareColCount*self.cellColCount):
                                 if self.possibilities[row][col] != self.grid[row][col]:
                                     self.firstChange = [[row, col], self.possibilities[row][col]]
-            
+
                     self.grid = self.possibilities
         else:#If no solution dont update grid
             self.noOfSolutions = 0
@@ -302,7 +297,7 @@ class sudoku():
                 return "unsolvable"
             else:
                 return self.firstChange
-  
+
     def checkSudoku(self):
         return self.check(self.possibilities)
 
@@ -322,7 +317,7 @@ class sudoku():
 
     def applyRestrictions(self, possibilities):
         previousPossibilities = []
-        
+
         while previousPossibilities != str(possibilities):
             previousPossibilities = str(possibilities)
             for restriction in self.getRestrictionPointers():
@@ -331,7 +326,7 @@ class sudoku():
                     possibilities = self.insert(pointers, possibilities)
 
         return possibilities
-    
+
     def getRestrictionPointers(self):
         yield self.rowRestriction()
         yield self.columnRestriction()
@@ -342,7 +337,7 @@ class sudoku():
             row = 0
             col = 0
             while not len(possibilities[row][col]) > 1:
-                
+
                 row += 1
                 if row == self.squareRowCount*self.cellRowCount:
                     col += 1
@@ -451,7 +446,7 @@ def generateGaussianKernel(sigma, size):
 class sudokuImage():
     def __init__(self, imageData, Directory = 'images/'):
         #Inherit Module by delegated wrapper
-        self._img = Image.open(io.BytesIO(imageData)).convert('L')
+        self._img = imageData.convert('L')
 
         if self.height > 1000 or self.width > 1000:
             if self.height > self.width:
@@ -523,7 +518,7 @@ class sudokuImage():
 
         #separate into grid
         grid = self.getCells(corners, warped)
-        
+
         #clean grid
         for row in range(9):
             for col in range(9):
@@ -650,20 +645,21 @@ class sudokuImage():
 
         possibleSudokus = components[-4:]
         possibleCorners = [[min(sudoku, key = lambda x:x[0]+x[1]), max(sudoku, key = lambda x:x[0]-x[1]), max(sudoku, key = lambda x:x[0]+x[1]), min(sudoku, key = lambda x:x[0]-x[1])] for sudoku in possibleSudokus]#lt lb rb rt
-        
+
         #Find most Sudoku-like
         biggest = [0]
         for i in range(0, 4):
-            self.saveArray('currentComponent.jpg', possibleSudokus[i], pixles)
+            if verbose:
+                self.saveArray('currentComponent.jpg', possibleSudokus[i], pixles)
             size = self.countOnEdge(possibleSudokus[i], possibleCorners[i])*(i+2)/5
-            
+
             if size >= biggest[0]:
                 biggest = [size, i]
 
         if verbose:
             for i in range(1, 5):
                 self.saveArray('component' + str(i) + '.jpg', components[-i], pixles)
-        
+
         corners = possibleCorners[biggest[1]]
         if verbose:
             self.saveArray('corners.jpg', corners, pixles)
@@ -689,7 +685,8 @@ class sudokuImage():
 
                     while len(overflows) > 0:
                         moreOverflows = []
-                        print(len(overflows))
+                        if verbose:
+                            print(len(overflows))
                         for row, col in overflows:
                             for r in range(-1,2):
                                 for c in range(-1,2):
@@ -700,7 +697,8 @@ class sudokuImage():
 
                         overflows = [i for i in moreOverflows]
 
-                        print('uo', len(moreOverflows))
+                        if verbose:
+                            print('uo', len(moreOverflows))
 
                     components.append(component)
 
@@ -712,7 +710,7 @@ class sudokuImage():
                 return [], [[row,col]]
             else:
                 self.pixlesTemp[row][col] = 0
-                component = [[row,col]] 
+                component = [[row,col]]
                 overflow = []
                 for r in range(-1,2):
                     for c in range(-1,2):
@@ -791,12 +789,6 @@ def display(pixles):
     imageFromPixles = Image.fromarray(np.uint8([pixles[i:i+28]*255 for i in range(0,784,28)]))
     imageFromPixles.show()
 
-verbose = True
-nt = network()
-addr = 'localhost'
-port = 8080
-serverAddress = (addr, port)
 
-with socketserver.TCPServer(serverAddress, handler) as httpd:
-    print(f'Starting httpd server on {addr}:{port}')
-    httpd.serve_forever()
+verbose = False
+nt = network()
