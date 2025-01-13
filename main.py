@@ -8,6 +8,8 @@ Created on Wed May 11 23:43:51 2022
 
 # A very simple Flask Hello World app for you to get started with...
 
+import os
+
 from flask import Flask, request
 import numpy as np
 from PIL import Image
@@ -792,3 +794,6 @@ def display(pixles):
 
 verbose = False
 nt = network()
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
